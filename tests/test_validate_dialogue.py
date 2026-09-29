@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-from validate_dialogue import CANONICAL_FLAGS, DIALOGUE_DIR, ROOT, validate_file
+from validate_dialogue import CANONICAL_FLAGS, DIALOGUE_DIR, ROOT, reachable, validate_file
 
 
 class ConditionalChoiceTests(unittest.TestCase):
@@ -166,6 +166,94 @@ class ConditionalChoiceTests(unittest.TestCase):
             self.assertEqual(result.stderr, "")
             self.assertIn("invalid.json:start: 'set_flag' uses unknown story flag 'lamp_relit'", result.stdout)
             self.assertIn("1 error(s), 0 warning(s)", result.stdout)
+
+    def test_broken_reachability_examples(self):
+        for filename, node in (("self_unlock.json", "start"), ("incompatible_paths.json", "merge")):
+            with self.subTest(filename=filename):
+                path = ROOT / "tests" / "fixtures" / "dialogue" / filename
+                errors, warnings = validate_file(path)
+                self.assertEqual(errors, [
+                    f"{filename}:{node}: choice #0 is unreachable under any feasible flag state from entry points ['start']"
+                ])
+                self.assertEqual(warnings, [
+                    f"{filename}:blocked: unreachable from entry points ['start'] with feasible flag states"
+                ])
+
+    def test_unknown_entry_flag_is_allowed_but_fresh_state_defaults_false(self):
+        graph = {"start": {"choices": [
+            {"text": "Ask", "requires_flag": {"trusted_edith": True}, "next": "secret"},
+            {"text": "Leave", "next": None},
+        ]}, "secret": {"next": None}}
+        self.assertIn("secret", reachable(graph, {"start"})[0])
+        self.assertNotIn("secret", reachable(graph, {"start"}, initial_flags={})[0])
+        graph["start"]["choices"][0]["requires_flag"]["trusted_edith"] = False
+        self.assertIn("secret", reachable(graph, {"start"}, initial_flags={})[0])
+
+    def test_requirements_constrain_unknown_state_downstream(self):
+        graph = {
+            "start": {"choices": [
+                {"text": "Enter", "requires_flag": {"trusted_edith": True}, "next": "inside"},
+                {"text": "Leave", "next": None},
+            ]},
+            "inside": {"choices": [
+                {"text": "Contradiction", "requires_flag": {"trusted_edith": False}, "next": None},
+                {"text": "Leave", "next": None},
+            ]},
+        }
+        errors, warnings = self.validate_graph(graph)
+        self.assertEqual(warnings, [])
+        self.assertEqual(errors, [
+            "dialogue.json:inside: choice #0 is unreachable under any feasible flag state from entry points ['start']"
+        ])
+
+    def test_node_effect_overwrites_incoming_choice_effect_before_requirements(self):
+        graph = {
+            "start": {"choices": [{"text": "Enter", "set_flag": {"trusted_edith": False}, "next": "inside"}]},
+            "inside": {"set_flag": {"trusted_edith": True}, "choices": [
+                {"text": "Ask", "requires_flag": {"trusted_edith": True}, "next": None},
+                {"text": "Leave", "next": None},
+            ]},
+        }
+        self.assertEqual(self.validate_graph(graph), ([], []))
+
+    def test_changed_flags_allow_revisiting_node_and_cycle_terminates(self):
+        graph = {
+            "start": {"set_flag": {"trusted_edith": False}, "next": "loop"},
+            "loop": {"choices": [
+                {"text": "Unlock", "set_flag": {"trusted_edith": True}, "next": "loop"},
+                {"text": "Exit", "requires_flag": {"trusted_edith": True}, "next": "end"},
+            ]},
+            "end": {"next": None},
+        }
+        self.assertEqual(self.validate_graph(graph), ([], []))
+
+    def test_unreachable_choice_detected_even_when_target_is_reachable(self):
+        errors, warnings = self.validate_graph({
+            "start": {"set_flag": {"trusted_edith": False}, "choices": [
+                {"text": "Blocked", "requires_flag": {"trusted_edith": True}, "next": "end"},
+                {"text": "Leave", "next": "end"},
+            ]}, "end": {"next": None},
+        })
+        self.assertEqual(warnings, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("choice #0 is unreachable", errors[0])
+
+    def test_only_unreachable_terminal_is_not_enough(self):
+        errors, warnings = self.validate_graph({
+            "start": {"next": "start"}, "orphan": {"next": None},
+        })
+        self.assertEqual(errors, [
+            "dialogue.json: no terminal reachable from entry points ['start'] with feasible flag states"
+        ])
+        self.assertEqual(len(warnings), 1)
+
+    def test_non_boolean_values_and_types_are_preserved(self):
+        graph = {"start": {"set_flag": {"trusted_edith": 1}, "choices": [
+            {"text": "Boolean", "requires_flag": {"trusted_edith": True}, "next": None},
+            {"text": "Numeric", "requires_flag": {"trusted_edith": 1.0}, "next": None},
+            {"text": "Leave", "next": None},
+        ]}}
+        self.assertEqual(reachable(graph, {"start"})[1], {("start", 1), ("start", 2)})
 
 
 if __name__ == "__main__":

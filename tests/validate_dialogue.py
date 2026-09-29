@@ -9,7 +9,8 @@ Checks, for every data/dialogue/*.json file:
     story flag names from docs/narrative-bible.md
   - each choice node has an unconditional fallback (no requirements or {})
   - every referenced target id exists
-  - at least one terminal (next == null) exists in the graph
+  - prerequisites and flag effects determine feasible nodes and choices
+  - at least one terminal (next == null) is reachable from known entries
   - reports orphan nodes (unreachable from any known entry) as warnings
 
 Exit code 0 = all valid, 1 = at least one error.
@@ -48,26 +49,71 @@ def validate_flags(value: object, field: str, location: str) -> list[str]:
     return errors
 
 
-def reachable(graph: dict, entries: set[str]) -> set[str]:
-    seen: set[str] = set()
-    stack = [e for e in entries if e in graph]
+def same_value(left: object, right: object) -> bool:
+    """JSON value equality without Python's bool == int coercion."""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return left == right
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_value(left[k], right[k]) for k in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_value(a, b) for a, b in zip(left, right))
+    return left == right
+
+
+def reachable(graph: dict, entries: set[str], initial_flags: dict | None = None
+              ) -> tuple[set[str], set[tuple[str, int]], bool]:
+    """Explore feasible (node, flag constraints) states, not just graph edges.
+
+    None means arbitrary carried-in flags. A supplied dict is a concrete entry
+    state, with absent flags defaulting to false, just like GameState.get_flag().
+    Independent path dictionaries preserve correlations between requirements.
+    Only constant assignments and equality tests exist, so cycles reach a finite
+    fixed point. A node may be revisited with different flag constraints.
+    """
+    initial = {} if initial_flags is None else {
+        name: initial_flags.get(name, False) for name in CANONICAL_FLAGS
+    }
+    stack = [(entry, initial.copy()) for entry in sorted(entries) if entry in graph]
+    visited: set[tuple[str, str]] = set()
+    nodes: set[str] = set()
+    choices: set[tuple[str, int]] = set()
+    terminal = False
     while stack:
-        nid = stack.pop()
-        if nid in seen:
-            continue
-        seen.add(nid)
+        nid, state = stack.pop()
         node = graph[nid]
-        if not isinstance(node, dict):
-            continue  # Shape errors are reported by validate_file().
-        targets: list[str] = []
-        if isinstance(node.get("choices"), list):
-            targets += [c.get("next") for c in node["choices"] if isinstance(c, dict)]
-        if "next" in node:
-            targets.append(node.get("next"))
-        for t in targets:
-            if isinstance(t, str) and t in graph:
-                stack.append(t)
-    return seen
+        state = {**state, **node.get("set_flag", {})}
+        key = (nid, json.dumps(state, sort_keys=True))
+        if key in visited:
+            continue
+        visited.add(key)
+        nodes.add(nid)
+        options = node.get("choices", [])
+        if options:
+            for index, choice in enumerate(options):
+                requirements = choice.get("requires_flag", {})
+                if any(name in state and not same_value(state[name], value)
+                       for name, value in requirements.items()):
+                    continue
+                choices.add((nid, index))
+                # Unknown incoming flags are constrained by taking this choice.
+                # Effects happen only after its requirements have been met.
+                next_state = {**state, **requirements, **choice.get("set_flag", {})}
+                target = choice.get("next")
+                if target is None:
+                    terminal = True
+                else:
+                    stack.append((target, next_state))
+        else:
+            target = node.get("next")
+            if target is None:
+                terminal = True
+            else:
+                stack.append((target, state))
+    return nodes, choices, terminal
 
 
 def validate_file(path: Path) -> tuple[list[str], list[str]]:
@@ -92,6 +138,8 @@ def validate_file(path: Path) -> tuple[list[str], list[str]]:
 
         has_choices = isinstance(node.get("choices"), list) and len(node["choices"]) > 0
         has_next = "next" in node
+        if "choices" in node and not isinstance(node["choices"], list):
+            errors.append(f"{path.name}:{nid}: 'choices' must be an array")
 
         if not has_choices and not has_next:
             errors.append(f"{path.name}:{nid}: node has neither 'next' nor 'choices'")
@@ -100,6 +148,9 @@ def validate_file(path: Path) -> tuple[list[str], list[str]]:
 
         if has_next and node.get("next") is None:
             has_terminal = True
+
+        if has_next and node["next"] is not None and not isinstance(node["next"], str):
+            errors.append(f"{path.name}:{nid}: 'next' must be a node id or null")
 
         if has_next and isinstance(node.get("next"), str) and node["next"] not in graph:
             errors.append(f"{path.name}:{nid}: 'next' points to missing node '{node['next']}'")
@@ -130,10 +181,18 @@ def validate_file(path: Path) -> tuple[list[str], list[str]]:
     entries = KNOWN_ENTRIES & set(graph.keys())
     if not entries:
         warnings.append(f"{path.name}: no known entry point ({sorted(KNOWN_ENTRIES)}) present")
-    else:
-        seen = reachable(graph, entries)
+    elif not errors:
+        # Do not analyze invalid shapes or unknown flags, or emit misleading
+        # reachability diagnostics for a graph that failed structural checks.
+        seen, selectable, terminal = reachable(graph, entries)
         for orphan in sorted(set(graph) - seen):
-            warnings.append(f"{path.name}:{orphan}: unreachable from entry points {sorted(entries)}")
+            warnings.append(f"{path.name}:{orphan}: unreachable from entry points {sorted(entries)} with feasible flag states")
+        for nid, node in graph.items():
+            for index, _choice in enumerate(node.get("choices", [])):
+                if (nid, index) not in selectable:
+                    errors.append(f"{path.name}:{nid}: choice #{index} is unreachable under any feasible flag state from entry points {sorted(entries)}")
+        if not terminal:
+            errors.append(f"{path.name}: no terminal reachable from entry points {sorted(entries)} with feasible flag states")
 
     return errors, warnings
 

@@ -118,8 +118,23 @@ allowed: `skeptic`, `believer`, `trusted_edith`, and `radioed_tom`. Names are
 case-sensitive and are not trimmed. Add new story flags to the narrative bible
 and the validator's `CANONICAL_FLAGS` together; a regression checks they agree.
 The scaffold's `lamp_relit` is not canonical yet and is rejected in dialogue.
-This check does not restrict flag values or modify saved flags. The validator
-still does not prove that every branch can reach an ending.
+This check does not restrict flag values or modify saved flags.
+
+Reachability tracks separate `(node, flag state)` paths. Node effects run before
+requirements; choice effects run after them. A node can be revisited with changed
+flags, while repeated states stop cycles. Impossible choices are errors, even if
+another choice reaches the same target; unreachable nodes remain warnings. An
+ending must be reachable, not merely present. This does not prove that every
+branch or state can reach an ending.
+
+Entry flags are unknown by default: conversations can inherit flags from saves
+or earlier interactions. Requirements constrain those unknowns along each path;
+assignments overwrite them. This conservatively proves local impossibility,
+not whether a carried-in state is achievable across the whole game. The Python
+`reachable(..., initial_flags={})` helper can also check a fresh-game state,
+where missing flags are false. No entry-state fields are added to dialogue JSON.
+Broken reachability examples live in `tests/fixtures/dialogue/`, outside the
+normal content scan.
 
 ## Verifying changes
 
