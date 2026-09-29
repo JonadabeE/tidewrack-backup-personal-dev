@@ -111,8 +111,15 @@ runtime, the manager reports the node ID and ends dialogue, restoring movement;
 node-entry effects are not rolled back.
 
 The save format and flag names are unchanged. The validator checks requirement
-shape and fallback availability, not whether flag names are known or whether
-every branch can reach an ending.
+shape, fallback availability, and flag names in choice `requires_flag` and
+node/choice `set_flag` objects. Only the canonical flags in
+[`docs/narrative-bible.md`](docs/narrative-bible.md#story-flags-canonical) are
+allowed: `skeptic`, `believer`, `trusted_edith`, and `radioed_tom`. Names are
+case-sensitive and are not trimmed. Add new story flags to the narrative bible
+and the validator's `CANONICAL_FLAGS` together; a regression checks they agree.
+The scaffold's `lamp_relit` is not canonical yet and is rejected in dialogue.
+This check does not restrict flag values or modify saved flags. The validator
+still does not prove that every branch can reach an ending.
 
 ## Verifying changes
 

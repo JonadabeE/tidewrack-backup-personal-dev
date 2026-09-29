@@ -5,7 +5,8 @@ Checks, for every data/dialogue/*.json file:
   - it parses as a JSON object of node_id -> node
   - each node is either a linear node ("next": id|null) or a choice node
     ("choices": [{text, next, set_flag?, requires_flag?}]) — not neither, not both
-  - choice requires_flag is an object with nonempty flag-name keys
+  - choice requires_flag and node/choice set_flag are objects using canonical
+    story flag names from docs/narrative-bible.md
   - each choice node has an unconditional fallback (no requirements or {})
   - every referenced target id exists
   - at least one terminal (next == null) exists in the graph
@@ -24,8 +25,27 @@ from pathlib import Path
 # Entry-point node ids the game starts graphs from (see scripts/game.gd).
 KNOWN_ENTRIES = {"logbook", "radio", "door", "start"}
 
+# docs/narrative-bible.md, "Story flags (canonical)" is authoritative.
+# Update both together when introducing story flags; a regression checks parity.
+CANONICAL_FLAGS = frozenset({"skeptic", "believer", "trusted_edith", "radioed_tom"})
+
 ROOT = Path(__file__).resolve().parent.parent
 DIALOGUE_DIR = ROOT / "data" / "dialogue"
+
+
+def validate_flags(value: object, field: str, location: str) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"{location} '{field}' must be an object"]
+    errors = []
+    for name in value:
+        if not isinstance(name, str) or not name.strip():
+            errors.append(f"{location} '{field}' needs nonempty flag names")
+        elif name not in CANONICAL_FLAGS:
+            errors.append(
+                f"{location} '{field}' uses unknown story flag '{name}' "
+                "(see docs/narrative-bible.md: Story flags (canonical))"
+            )
+    return errors
 
 
 def reachable(graph: dict, entries: set[str]) -> set[str]:
@@ -68,6 +88,8 @@ def validate_file(path: Path) -> tuple[list[str], list[str]]:
             errors.append(f"{path.name}:{nid}: node must be an object")
             continue
 
+        errors += validate_flags(node.get("set_flag", {}), "set_flag", f"{path.name}:{nid}:")
+
         has_choices = isinstance(node.get("choices"), list) and len(node["choices"]) > 0
         has_next = "next" in node
 
@@ -89,11 +111,10 @@ def validate_file(path: Path) -> tuple[list[str], list[str]]:
                     errors.append(f"{path.name}:{nid}: choice #{i} needs a 'text' field")
                     continue
                 requirements = choice.get("requires_flag", {})
-                if not isinstance(requirements, dict):
-                    errors.append(f"{path.name}:{nid}: choice #{i} 'requires_flag' must be an object")
-                elif any(not isinstance(key, str) or not key.strip() for key in requirements):
-                    errors.append(f"{path.name}:{nid}: choice #{i} 'requires_flag' needs nonempty flag names")
-                elif not requirements:
+                location = f"{path.name}:{nid}: choice #{i}"
+                errors += validate_flags(requirements, "requires_flag", location)
+                errors += validate_flags(choice.get("set_flag", {}), "set_flag", location)
+                if isinstance(requirements, dict) and not requirements:
                     has_fallback = True
                 target = choice.get("next")
                 if target is not None and (not isinstance(target, str) or target not in graph):
