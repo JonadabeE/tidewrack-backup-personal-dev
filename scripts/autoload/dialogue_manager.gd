@@ -7,6 +7,8 @@ extends Node
 ##     "next": String|null,                     # linear node; null ends the graph
 ##     "choices": [ {"text": String, "next": String, "set_flag": {..}} ],
 ##     "set_flag": { "flag_name": value } }      # applied when the node is entered
+## Choices may also have "requires_flag": { "flag_name": value }.
+## All requirements must match GameState.get_flag(); missing flags default to false.
 ##
 ## UI (dialogue_box.gd) listens to these signals; it does not read the graph.
 
@@ -16,6 +18,7 @@ signal dialogue_finished
 
 var _graph: Dictionary = {}
 var _current_id: String = ""
+var _visible_choices: Array = []
 var is_active: bool = false
 
 
@@ -35,7 +38,7 @@ func advance() -> void:
 	if not is_active:
 		return
 	var node: Dictionary = _graph.get(_current_id, {})
-	if node.has("choices") and not (node["choices"] as Array).is_empty():
+	if not _visible_choices.is_empty():
 		return  # waiting on choose()
 	var next: Variant = node.get("next", null)
 	if next == null:
@@ -44,15 +47,13 @@ func advance() -> void:
 		_goto(str(next))
 
 
-## Pick choice `index` on a choice node.
+## Pick choice `index` from the same filtered array sent to the UI.
 func choose(index: int) -> void:
 	if not is_active:
 		return
-	var node: Dictionary = _graph.get(_current_id, {})
-	var choices: Array = node.get("choices", [])
-	if index < 0 or index >= choices.size():
+	if index < 0 or index >= _visible_choices.size():
 		return
-	var choice: Dictionary = choices[index]
+	var choice: Dictionary = _visible_choices[index]
 	_apply_flags(choice.get("set_flag", {}))
 	var next: Variant = choice.get("next", null)
 	if next == null:
@@ -62,6 +63,7 @@ func choose(index: int) -> void:
 
 
 func _goto(id: String) -> void:
+	_visible_choices = []
 	if not _graph.has(id):
 		push_error("DialogueManager: missing node '%s'." % id)
 		_finish()
@@ -69,11 +71,27 @@ func _goto(id: String) -> void:
 	_current_id = id
 	var node: Dictionary = _graph[id]
 	_apply_flags(node.get("set_flag", {}))
+	# Snapshot availability after node effects; keep indices stable for this line.
+	var choices: Array = node.get("choices", [])
+	for choice in choices:
+		if _meets_requirements(choice.get("requires_flag", {})):
+			_visible_choices.append(choice)
+	if not choices.is_empty() and _visible_choices.is_empty():
+		push_error("DialogueManager: no visible choices at node '%s'." % id)
+		_finish()
+		return
 	line_shown.emit(
 		str(node.get("speaker", "")),
 		str(node.get("text", "")),
-		node.get("choices", [])
+		_visible_choices
 	)
+
+
+func _meets_requirements(requirements: Dictionary) -> bool:
+	for key in requirements:
+		if GameState.get_flag(str(key)) != requirements[key]:
+			return false
+	return true
 
 
 func _apply_flags(dict: Dictionary) -> void:
@@ -85,6 +103,7 @@ func _finish() -> void:
 	is_active = false
 	_graph = {}
 	_current_id = ""
+	_visible_choices = []
 	dialogue_finished.emit()
 
 

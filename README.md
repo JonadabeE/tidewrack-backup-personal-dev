@@ -85,11 +85,46 @@ Any node can set story flags via `"set_flag"`, which `GameState` persists.
 }
 ```
 
+Choices can optionally require existing flags using `requires_flag`, with the
+same object style as `set_flag`:
+
+```json
+{
+  "text": "Ask him about Edith.",
+  "requires_flag": { "trusted_edith": true },
+  "next": "radio_edith",
+  "set_flag": { "radioed_tom": true }
+}
+```
+
+This is a schema example; existing conversations remain unchanged. All listed
+requirements must equal `GameState.get_flag(name)`. Missing flags default to
+`false`, so requiring `false` also matches a flag that has never been set.
+Omitting `requires_flag` or using `{}` makes a choice unconditional.
+
+Node `set_flag` effects run first, then available choices are captured for that
+line. The UI and `choose(index)` use that same filtered list; availability stays
+fixed until the next node. Choice effects still run only when selected.
+Every choice node must include at least one unconditional fallback, even if its
+conditions appear exhaustive. If an invalid graph has no visible choices at
+runtime, the manager reports the node ID and ends dialogue, restoring movement;
+node-entry effects are not rolled back.
+
+The save format and flag names are unchanged. The validator checks requirement
+shape and fallback availability, not whether flag names are known or whether
+every branch can reach an ending.
+
 ## Verifying changes
 
 ```bash
 # Validate every dialogue graph (targets resolve, has an ending, no orphans)
 python3 tests/validate_dialogue.py
+
+# Conditional-choice validator regressions
+python3 -m unittest discover -s tests -p 'test_*.py'
+
+# Runtime regressions (in-memory flags; does not touch save.json)
+godot --headless --path . --script tests/test_dialogue_manager.gd
 
 # In-engine checks (requires Godot on PATH)
 godot --headless --path . --check-only   # parse all scripts

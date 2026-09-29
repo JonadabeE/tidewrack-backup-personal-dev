@@ -4,9 +4,11 @@
 Checks, for every data/dialogue/*.json file:
   - it parses as a JSON object of node_id -> node
   - each node is either a linear node ("next": id|null) or a choice node
-    ("choices": [{text, next, set_flag?}]) — not neither, not both
+    ("choices": [{text, next, set_flag?, requires_flag?}]) — not neither, not both
+  - choice requires_flag is an object with nonempty flag-name keys
+  - each choice node has an unconditional fallback (no requirements or {})
   - every referenced target id exists
-  - at least one terminal (next == null) is reachable from an entry point
+  - at least one terminal (next == null) exists in the graph
   - reports orphan nodes (unreachable from any known entry) as warnings
 
 Exit code 0 = all valid, 1 = at least one error.
@@ -35,9 +37,11 @@ def reachable(graph: dict, entries: set[str]) -> set[str]:
             continue
         seen.add(nid)
         node = graph[nid]
+        if not isinstance(node, dict):
+            continue  # Shape errors are reported by validate_file().
         targets: list[str] = []
         if isinstance(node.get("choices"), list):
-            targets += [c.get("next") for c in node["choices"]]
+            targets += [c.get("next") for c in node["choices"] if isinstance(c, dict)]
         if "next" in node:
             targets.append(node.get("next"))
         for t in targets:
@@ -79,15 +83,25 @@ def validate_file(path: Path) -> tuple[list[str], list[str]]:
             errors.append(f"{path.name}:{nid}: 'next' points to missing node '{node['next']}'")
 
         if has_choices:
+            has_fallback = False
             for i, choice in enumerate(node["choices"]):
                 if not isinstance(choice, dict) or "text" not in choice:
                     errors.append(f"{path.name}:{nid}: choice #{i} needs a 'text' field")
                     continue
+                requirements = choice.get("requires_flag", {})
+                if not isinstance(requirements, dict):
+                    errors.append(f"{path.name}:{nid}: choice #{i} 'requires_flag' must be an object")
+                elif any(not isinstance(key, str) or not key.strip() for key in requirements):
+                    errors.append(f"{path.name}:{nid}: choice #{i} 'requires_flag' needs nonempty flag names")
+                elif not requirements:
+                    has_fallback = True
                 target = choice.get("next")
                 if target is not None and (not isinstance(target, str) or target not in graph):
                     errors.append(f"{path.name}:{nid}: choice #{i} 'next' -> missing node '{target}'")
                 if target is None:
                     has_terminal = True
+            if not has_fallback:
+                errors.append(f"{path.name}:{nid}: choice node needs an unconditional fallback (omit 'requires_flag' or use {{}})")
 
     if not has_terminal:
         errors.append(f"{path.name}: no terminal node (a node with next == null) — the graph never ends")
