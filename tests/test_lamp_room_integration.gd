@@ -82,6 +82,14 @@ func _run() -> void:
 			var buttons := current_scene.get_node("PauseLayer").find_children("*", "Button", true, false)
 			buttons[0].pressed.emit()
 			await process_frame
+			var cancel := InputEventAction.new()
+			cancel.action = "ui_cancel"
+			cancel.pressed = true
+			current_scene._unhandled_input(cancel)
+			_check(current_scene.has_node("PauseLayer"), "Escape opens pause overlay")
+			current_scene._unhandled_input(cancel)
+			await process_frame
+			_check(not current_scene.has_node("PauseLayer") and not current_scene._paused and current_scene._player.can_move, "Escape resumes and removes overlay")
 			await _interact(current_scene, "Ground-floor stair")
 			_check(current_scene.scene_file_path == "res://scenes/game.tscn", "return stair reaches lighthouse")
 			_check(state.current_scene == "res://scenes/game.tscn", "return updates saved scene")

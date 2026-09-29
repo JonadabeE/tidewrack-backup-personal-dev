@@ -267,6 +267,21 @@ class ConditionalChoiceTests(unittest.TestCase):
                         prefix + " flag 'trusted_edith' must be a boolean (true or false)"
                     ], []))
 
+    def test_cli_reports_invalid_json_and_top_level_without_traceback(self):
+        for raw, diagnostic in (("{broken", "invalid JSON"), ("42", "top level must be an object")):
+            with self.subTest(raw=raw), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "tests").mkdir()
+                (root / "data" / "dialogue").mkdir(parents=True)
+                script = root / "tests" / "validate_dialogue.py"
+                script.write_text((ROOT / "tests" / "validate_dialogue.py").read_text())
+                (root / "data" / "dialogue" / "invalid.json").write_text(raw)
+                result = subprocess.run([sys.executable, "-B", str(script)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(result.stderr, "")
+                self.assertIn(diagnostic, result.stdout)
+                self.assertIn("1 error(s), 0 warning(s)", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

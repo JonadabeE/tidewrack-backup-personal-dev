@@ -212,7 +212,10 @@ def main() -> int:
         all_errors += errs
         all_warnings += warns
         status = "OK" if not errs else "FAIL"
-        print(f"[{status}] {path.relative_to(ROOT)}  ({len(json.loads(path.read_text()))} nodes)")
+        # Invalid JSON/top-level types already have diagnostics; do not parse
+        # them again merely to print a node count.
+        count = f"  ({len(json.loads(path.read_text()))} nodes)" if not errs else ""
+        print(f"[{status}] {path.relative_to(ROOT)}{count}")
 
     for w in all_warnings:
         print(f"  warning: {w}")

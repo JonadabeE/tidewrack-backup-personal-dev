@@ -176,10 +176,20 @@ func _set_movement(enabled: bool) -> void:
 func _toggle_pause() -> void:
 	if DialogueManager.is_active:
 		return
-	_paused = not _paused
-	_set_movement(not _paused)
 	if _paused:
+		_resume_game()
+	else:
+		_paused = true
+		_set_movement(false)
 		_show_pause_menu()
+
+
+func _resume_game() -> void:
+	var layer := get_node_or_null("PauseLayer")
+	if layer != null:
+		layer.queue_free()
+	_paused = false
+	_set_movement(true)
 
 
 func _show_pause_menu() -> void:
@@ -206,10 +216,7 @@ func _show_pause_menu() -> void:
 	center.add_child(vbox)
 
 	var resume := _menu_button("Resume")
-	resume.pressed.connect(func():
-		layer.queue_free()
-		_paused = false
-		_set_movement(true))
+	resume.pressed.connect(_resume_game)
 	vbox.add_child(resume)
 
 	var save := _menu_button("Save")

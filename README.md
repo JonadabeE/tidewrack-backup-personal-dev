@@ -158,7 +158,7 @@ saved-scene field; saving remains manual. Dialogue remains replayable.
 The old `lamp_room.json` placeholder is unused, and no `lamp_relit` state is written.
 
 ```bash
-# Validate every dialogue graph (targets resolve, has an ending, no orphans)
+# Validate targets, flags, choices and reachability (orphan nodes warn)
 python3 tests/validate_dialogue.py
 
 # Conditional-choice validator regressions
@@ -169,13 +169,13 @@ godot --headless --path . --script tests/test_dialogue_manager.gd
 godot --headless --path . --script tests/test_lamp_room_integration.gd
 
 # In-engine checks (requires Godot on PATH)
-godot --headless --path . --check-only   # parse all scripts
+godot --headless --editor --path . --quit
 ```
 
-> The GDScript in this build was authored without a local Godot install, so it
-> has been checked statically and via the dialogue validator, **not** yet run in
-> the engine. First engine open may surface minor fixups — tracked in the issue
-> list.
+The conditional-choice runtime and lighthouse/lamp-room round trip have been
+tested headlessly in Godot 4.3. A representative version 1 save was loaded,
+rewritten and compared in isolated storage, preserving its scene, flags and JSON
+structure. An interactive visual/controller playthrough is still outstanding.
 
 ## Steam Next Fest demo
 
