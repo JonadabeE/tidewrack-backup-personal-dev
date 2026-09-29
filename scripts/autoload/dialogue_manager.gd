@@ -8,7 +8,7 @@ extends Node
 ##     "choices": [ {"text": String, "next": String, "set_flag": {..}} ],
 ##     "set_flag": { "flag_name": value } }      # applied when the node is entered
 ## Choices may also have "requires_flag": { "flag_name": value }.
-## All requirements must match GameState.get_flag(); missing flags default to false.
+## All requirements use GameState.flag_matches(); missing flags default to false.
 ##
 ## UI (dialogue_box.gd) listens to these signals; it does not read the graph.
 
@@ -89,7 +89,7 @@ func _goto(id: String) -> void:
 
 func _meets_requirements(requirements: Dictionary) -> bool:
 	for key in requirements:
-		if GameState.get_flag(str(key)) != requirements[key]:
+		if not GameState.flag_matches(str(key), requirements[key]):
 			return false
 	return true
 

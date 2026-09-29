@@ -98,7 +98,9 @@ same object style as `set_flag`:
 ```
 
 This is a schema example; existing conversations remain unchanged. All listed
-requirements must equal `GameState.get_flag(name)`. Missing flags default to
+requirements are checked by the read-only public method
+`GameState.flag_matches(name, expected)`, which compares `get_flag(name)` with
+the expected value. Missing flags default to
 `false`, so requiring `false` also matches a flag that has never been set.
 Omitting `requires_flag` or using `{}` makes a choice unconditional.
 
