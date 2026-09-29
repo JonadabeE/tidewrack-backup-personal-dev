@@ -148,8 +148,12 @@ option. Keeping the account private sets `trusted_edith` to false; the other
 paths preserve existing flags. Planning to speak to Tom does not set
 `radioed_tom`, since no radio conversation occurs here.
 
-The scene remains a scaffold: this graph is not yet wired to the lamp interaction.
-The old `lamp_room.json` placeholder remains, and no `lamp_relit` state is written.
+Use the ground-floor stair to enter the lamp room, then approach the Great lamp
+and interact to start this graph. The return stair leads back to the radio and
+logbook. The lamp room reuses movement, proximity prompts, dialogue UI and the
+pause/save menu from the ground floor. Entering a room updates the existing
+saved-scene field; saving remains manual. Dialogue remains replayable.
+The old `lamp_room.json` placeholder is unused, and no `lamp_relit` state is written.
 
 ```bash
 # Validate every dialogue graph (targets resolve, has an ending, no orphans)
@@ -160,6 +164,7 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 
 # Runtime regressions (in-memory flags; does not touch save.json)
 godot --headless --path . --script tests/test_dialogue_manager.gd
+godot --headless --path . --script tests/test_lamp_room_integration.gd
 
 # In-engine checks (requires Godot on PATH)
 godot --headless --path . --check-only   # parse all scripts
