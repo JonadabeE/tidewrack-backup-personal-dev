@@ -1,0 +1,101 @@
+{
+	"start": {
+		"speaker": "",
+		"text": "The stair ends beneath the great lens. Salt has dried along the window frames. Outside, the fog presses close enough to hide the gallery rail. The lamp is cold.",
+		"next": "prepare"
+	},
+	"prepare": {
+		"speaker": "",
+		"text": "A paraffin tin stands beside the service cupboard. There are matches in a dry drawer and a cloth folded over the burner key. Someone left the ordinary things where the next keeper would need them.",
+		"choices": [
+			{ "text": "Check what the glass could make someone see.", "requires_flag": { "skeptic": true }, "next": "check_glass" },
+			{ "text": "Make a record to share with Tom.", "requires_flag": { "trusted_edith": true }, "next": "record_before" },
+			{ "text": "Get the lamp working.", "next": "tend_lamp" }
+		]
+	},
+	"check_glass": {
+		"speaker": "",
+		"text": "You move the matchbox past the window. Its pale label doubles in the glass, then slides away as you turn your head. A tired keeper could mistake a reflection for something farther out. You leave a small clear patch in the salt to look through later.",
+		"next": "tend_lamp"
+	},
+	"record_before": {
+		"speaker": "",
+		"text": "On the service pad you write: lamp cold on arrival; fog to the gallery. You leave space below it. If you are going to share Edith's account, Tom should be able to tell her words from what you have seen yourself.",
+		"next": "tend_lamp"
+	},
+	"tend_lamp": {
+		"speaker": "",
+		"text": "You fill the reservoir and trim the black edge from the wick. The burner key turns reluctantly. Eleven days without a keeper, and the work still fits into a pair of hands.",
+		"next": "light_choice"
+	},
+	"light_choice": {
+		"speaker": "",
+		"text": "The first match breaks. The second catches. You shelter its small flame beneath your palm.",
+		"choices": [
+			{ "text": "Light the wick.", "next": "relight" }
+		]
+	},
+	"relight": {
+		"speaker": "",
+		"text": "The flame settles, and gold gathers in the lens. You wind the drive and release it. The light begins its slow passage across the windows. Three flashes reach into the fog. Then dark.",
+		"next": "answer"
+	},
+	"answer": {
+		"speaker": "",
+		"text": "Beyond the north rocks, a small light appears. Once. Twice. A third time. It goes out before your beam returns. You keep your hand on the railing until you notice how hard you are holding it.",
+		"next": "response"
+	},
+	"response": {
+		"speaker": "",
+		"text": "The lens turns behind you. Out past the glass, there is nothing to measure the distance by.",
+		"choices": [
+			{ "text": "Change your viewpoint. Test whether it is a reflection.", "requires_flag": { "skeptic": true }, "next": "test_reflection" },
+			{ "text": "Write down exactly what Tom needs to hear.", "requires_flag": { "trusted_edith": true }, "next": "record_answer" },
+			{ "text": "Watch through another turn of the lens.", "next": "watch" }
+		]
+	},
+	"test_reflection": {
+		"speaker": "",
+		"text": "You cross to the next window and cup your hands against the glass. The room's reflections move with you. The distant light does not. Three flashes, after yours. You cannot find a fault in the glass that accounts for it. That does not tell you what it is.",
+		"next": "test_signal"
+	},
+	"test_signal": {
+		"speaker": "",
+		"text": "A hand shutter hangs beside the window. You lift it across a narrow pane and uncover the light once, between the regular turns of the lens. Far out in the fog, a single flash follows. You lower the shutter. Your hands are steady; you wish that helped.",
+		"next": "what_to_share"
+	},
+	"record_answer": {
+		"speaker": "",
+		"text": "You write the direction first. Then the count, and the pause after your own light. You do not write Edith's name beside it. A similar account is not proof that you have found her. But it is something you can bring to the radio downstairs.",
+		"next": "what_to_share"
+	},
+	"watch": {
+		"speaker": "",
+		"text": "On the next turn, you count under your breath. The answering flashes come in the same order. When you stop counting, the silence seems to wait for you to begin again.",
+		"next": "what_to_share"
+	},
+	"what_to_share": {
+		"speaker": "",
+		"text": "Below you, the stair leads back to the radio and the open ledger. Above the burner, the warm metal ticks. For now, keeping this light on is a job you understand.",
+		"choices": [
+			{ "text": "Take the account downstairs for Tom, as planned.", "requires_flag": { "trusted_edith": true }, "next": "end_share" },
+			{ "text": "Keep the account to yourself for now.", "set_flag": { "trusted_edith": false }, "next": "end_quiet" },
+			{ "text": "Stay with the lamp a little longer.", "next": "end_watch" }
+		]
+	},
+	"end_share": {
+		"speaker": "",
+		"text": "Before leaving, you put the count and direction on a clean page and fold it into your coat. Tom can hear what you saw. He can hear Edith's account, too. Behind you, the lens keeps turning. Before you reach the first stair, the light beyond the rocks answers again.",
+		"next": null
+	},
+	"end_quiet": {
+		"speaker": "",
+		"text": "You leave the radio for later. The lamp has its fuel, its flame, its steady turn. Beyond the north rocks, three small flashes return. Whatever is out there has noticed the light is back.",
+		"next": null
+	},
+	"end_watch": {
+		"speaker": "",
+		"text": "You pull the keeper's stool close to the warm housing. Your light crosses the water you cannot see. A pause; then the answer. For the first time since you arrived, the lighthouse no longer feels empty. You are not sure that is a comfort.",
+		"next": null
+	}
+}

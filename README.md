@@ -140,6 +140,17 @@ normal content scan.
 
 ## Verifying changes
 
+The lamp-room chapter is authored in `data/dialogue/keeper_lamp_room.json`,
+starting at `start`: tend and relight the lamp, observe the answering light, then
+decide what to share. `trusted_edith` gates recording/sharing choices; `skeptic`
+gates reflection checks and a signal test. Every choice node has an unconditional
+option. Keeping the account private sets `trusted_edith` to false; the other
+paths preserve existing flags. Planning to speak to Tom does not set
+`radioed_tom`, since no radio conversation occurs here.
+
+The scene remains a scaffold: this graph is not yet wired to the lamp interaction.
+The old `lamp_room.json` placeholder remains, and no `lamp_relit` state is written.
+
 ```bash
 # Validate every dialogue graph (targets resolve, has an ending, no orphans)
 python3 tests/validate_dialogue.py
