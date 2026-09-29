@@ -85,20 +85,97 @@ Any node can set story flags via `"set_flag"`, which `GameState` persists.
 }
 ```
 
-## Verifying changes
+Choices can optionally require existing flags using `requires_flag`, with the
+same object style as `set_flag`:
 
-```bash
-# Validate every dialogue graph (targets resolve, has an ending, no orphans)
-python3 tests/validate_dialogue.py
-
-# In-engine checks (requires Godot on PATH)
-godot --headless --path . --check-only   # parse all scripts
+```json
+{
+  "text": "Ask him about Edith.",
+  "requires_flag": { "trusted_edith": true },
+  "next": "radio_edith",
+  "set_flag": { "radioed_tom": true }
+}
 ```
 
-> The GDScript in this build was authored without a local Godot install, so it
-> has been checked statically and via the dialogue validator, **not** yet run in
-> the engine. First engine open may surface minor fixups — tracked in the issue
-> list.
+This is a schema example; existing conversations remain unchanged. All listed
+requirements are checked by the read-only public method
+`GameState.flag_matches(name, expected)`, which compares `get_flag(name)` with
+the expected value. Missing flags default to
+`false`, so requiring `false` also matches a flag that has never been set.
+Omitting `requires_flag` or using `{}` makes a choice unconditional.
+
+Node `set_flag` effects run first, then available choices are captured for that
+line. The UI and `choose(index)` use that same filtered list; availability stays
+fixed until the next node. Choice effects still run only when selected.
+Every choice node must include at least one unconditional fallback, even if its
+conditions appear exhaustive. If an invalid graph has no visible choices at
+runtime, the manager reports the node ID and ends dialogue, restoring movement;
+node-entry effects are not rolled back.
+
+The save format and flag names are unchanged. The validator checks requirement
+shape, fallback availability, and flag names in choice `requires_flag` and
+node/choice `set_flag` objects. Only the canonical flags in
+[`docs/narrative-bible.md`](docs/narrative-bible.md#story-flags-canonical) are
+allowed: `skeptic`, `believer`, `trusted_edith`, and `radioed_tom`. Names are
+case-sensitive and are not trimmed. Add new story flags to the narrative bible
+and the validator's `CANONICAL_FLAGS` together; a regression checks they agree.
+The scaffold's `lamp_relit` is not canonical yet and is rejected in dialogue.
+Values in `requires_flag` and node/choice `set_flag` must be JSON booleans
+(`true` or `false`), not strings, numbers, null, arrays or objects. This is an
+authoring check only; saved flags and runtime save/load behavior are unchanged.
+
+Reachability tracks separate `(node, flag state)` paths. Node effects run before
+requirements; choice effects run after them. A node can be revisited with changed
+flags, while repeated states stop cycles. Impossible choices are errors, even if
+another choice reaches the same target; unreachable nodes remain warnings. An
+ending must be reachable, not merely present. This does not prove that every
+branch or state can reach an ending.
+
+Entry flags are unknown by default: conversations can inherit flags from saves
+or earlier interactions. Requirements constrain those unknowns along each path;
+assignments overwrite them. This conservatively proves local impossibility,
+not whether a carried-in state is achievable across the whole game. The Python
+`reachable(..., initial_flags={})` helper can also check a fresh-game state,
+where missing flags are false. No entry-state fields are added to dialogue JSON.
+Broken reachability examples live in `tests/fixtures/dialogue/`, outside the
+normal content scan.
+
+## Verifying changes
+
+The lamp-room chapter is authored in `data/dialogue/keeper_lamp_room.json`,
+starting at `start`: tend and relight the lamp, observe the answering light, then
+decide what to share. `trusted_edith` gates recording/sharing choices; `skeptic`
+gates reflection checks and a signal test. Every choice node has an unconditional
+option. Keeping the account private sets `trusted_edith` to false; the other
+paths preserve existing flags. Planning to speak to Tom does not set
+`radioed_tom`, since no radio conversation occurs here.
+
+Use the ground-floor stair to enter the lamp room, then approach the Great lamp
+and interact to start this graph. The return stair leads back to the radio and
+logbook. The lamp room reuses movement, proximity prompts, dialogue UI and the
+pause/save menu from the ground floor. Entering a room updates the existing
+saved-scene field; saving remains manual. Dialogue remains replayable.
+The old `lamp_room.json` placeholder is unused, and no `lamp_relit` state is written.
+
+```bash
+# Validate targets, flags, choices and reachability (orphan nodes warn)
+python3 tests/validate_dialogue.py
+
+# Conditional-choice validator regressions
+python3 -m unittest discover -s tests -p 'test_*.py'
+
+# Runtime regressions (in-memory flags; does not touch save.json)
+godot --headless --path . --script tests/test_dialogue_manager.gd
+godot --headless --path . --script tests/test_lamp_room_integration.gd
+
+# In-engine checks (requires Godot on PATH)
+godot --headless --editor --path . --quit
+```
+
+The conditional-choice runtime and lighthouse/lamp-room round trip have been
+tested headlessly in Godot 4.3. A representative version 1 save was loaded,
+rewritten and compared in isolated storage, preserving its scene, flags and JSON
+structure. An interactive visual/controller playthrough is still outstanding.
 
 ## Steam Next Fest demo
 

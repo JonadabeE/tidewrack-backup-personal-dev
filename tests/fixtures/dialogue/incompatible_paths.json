@@ -1,0 +1,41 @@
+{
+  "start": {
+    "choices": [
+      {
+        "text": "Skeptic path",
+        "set_flag": {
+          "skeptic": true,
+          "believer": false
+        },
+        "next": "merge"
+      },
+      {
+        "text": "Believer path",
+        "set_flag": {
+          "skeptic": false,
+          "believer": true
+        },
+        "next": "merge"
+      }
+    ]
+  },
+  "merge": {
+    "choices": [
+      {
+        "text": "Impossible combination",
+        "requires_flag": {
+          "skeptic": true,
+          "believer": true
+        },
+        "next": "blocked"
+      },
+      {
+        "text": "Leave",
+        "next": null
+      }
+    ]
+  },
+  "blocked": {
+    "next": null
+  }
+}

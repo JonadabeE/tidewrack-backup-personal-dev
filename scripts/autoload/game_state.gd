@@ -24,6 +24,11 @@ func get_flag(name: String, default: Variant = false) -> Variant:
 	return flags.get(name, default)
 
 
+## Read-only prerequisite check. Unset flags match false, as in get_flag().
+func flag_matches(name: String, expected: Variant) -> bool:
+	return get_flag(name) == expected
+
+
 func new_game() -> void:
 	flags.clear()
 	current_scene = "res://scenes/game.tscn"

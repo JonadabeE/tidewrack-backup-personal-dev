@@ -12,9 +12,11 @@ var _interactables: Array[Interactable] = []
 var _prompt: Label
 var _nearest: Interactable = null
 var _paused: bool = false
+var _transitioning: bool = false
 
 
 func _ready() -> void:
+	GameState.current_scene = scene_file_path
 	_build_room()
 	_build_player()
 	_build_interactables()
@@ -23,8 +25,20 @@ func _ready() -> void:
 	var dialogue_box := preload("res://scenes/ui/dialogue_box.tscn").instantiate()
 	add_child(dialogue_box)
 
-	DialogueManager.dialogue_started.connect(func(): _set_movement(false))
-	DialogueManager.dialogue_finished.connect(func(): _set_movement(true))
+	DialogueManager.dialogue_started.connect(_on_dialogue_started)
+	DialogueManager.dialogue_finished.connect(_on_dialogue_finished)
+
+
+func _on_dialogue_started() -> void:
+	_set_movement(false)
+
+
+func _on_dialogue_finished() -> void:
+	_set_movement(true)
+
+
+func _room_title() -> String:
+	return "Cape Marrow Light — ground floor"
 
 
 func _build_room() -> void:
@@ -40,7 +54,7 @@ func _build_room() -> void:
 	add_child(floor_rect)
 
 	var title := Label.new()
-	title.text = "Cape Marrow Light — ground floor"
+	title.text = _room_title()
 	title.position = Vector2(ROOM.position.x, ROOM.position.y - 34)
 	title.modulate = Color(1, 1, 1, 0.5)
 	add_child(title)
@@ -63,11 +77,13 @@ func _build_interactables() -> void:
 		Vector2(ROOM.position.x + 160, ROOM.position.y + 120), Color("#8a6f4b"))
 	_add_interactable("Radio set", "Call the mainland", "radio",
 		Vector2(ROOM.position.x + ROOM.size.x - 180, ROOM.position.y + 130), Color("#4b6f8a"))
-	_add_interactable("Lamp-room stair", "Climb toward the light", "door",
+	var stair := _add_interactable("Lamp-room stair", "Climb toward the light", "door",
 		Vector2(ROOM.position.x + ROOM.size.x * 0.5, ROOM.position.y + 60), Color("#3a4a54"))
+	stair.dialogue_path = ""
+	stair.interacted.connect(_travel_to.bind("res://scenes/lamp_room.tscn"))
 
 
-func _add_interactable(label: String, prompt: String, start_id: String, pos: Vector2, color: Color) -> void:
+func _add_interactable(label: String, prompt: String, start_id: String, pos: Vector2, color: Color) -> Interactable:
 	var item := Interactable.new()
 	item.label = label
 	item.prompt_text = prompt
@@ -78,6 +94,23 @@ func _add_interactable(label: String, prompt: String, start_id: String, pos: Vec
 	add_child(item)
 	item.setup()
 	_interactables.append(item)
+	return item
+
+
+func _travel_to(_source: Interactable, path: String) -> void:
+	if _transitioning or DialogueManager.is_active or _paused:
+		return
+	_transitioning = true
+	_set_movement(false)
+	_change_room.call_deferred(path)
+
+
+func _change_room(path: String) -> void:
+	var error := get_tree().change_scene_to_file(path)
+	if error != OK:
+		push_error("Could not enter scene '%s': %s" % [path, error])
+		_transitioning = false
+		_set_movement(true)
 
 
 func _build_hud() -> void:
@@ -97,7 +130,7 @@ func _build_hud() -> void:
 
 
 func _process(_delta: float) -> void:
-	if _paused or DialogueManager.is_active:
+	if _paused or _transitioning or DialogueManager.is_active:
 		_prompt.hide()
 		return
 	_nearest = _find_nearest()
@@ -122,11 +155,13 @@ func _find_nearest() -> Interactable:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _transitioning:
+		return
 	if event.is_action_pressed("ui_cancel"):
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
 		return
-	if _paused or DialogueManager.is_active:
+	if _paused or _transitioning or DialogueManager.is_active:
 		return
 	if event.is_action_pressed("ui_accept") and _nearest != null:
 		_nearest.interact()
@@ -135,16 +170,26 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _set_movement(enabled: bool) -> void:
 	if _player != null:
-		_player.can_move = enabled and not _paused
+		_player.can_move = enabled and not _paused and not _transitioning
 
 
 func _toggle_pause() -> void:
 	if DialogueManager.is_active:
 		return
-	_paused = not _paused
-	_set_movement(not _paused)
 	if _paused:
+		_resume_game()
+	else:
+		_paused = true
+		_set_movement(false)
 		_show_pause_menu()
+
+
+func _resume_game() -> void:
+	var layer := get_node_or_null("PauseLayer")
+	if layer != null:
+		layer.queue_free()
+	_paused = false
+	_set_movement(true)
 
 
 func _show_pause_menu() -> void:
@@ -171,10 +216,7 @@ func _show_pause_menu() -> void:
 	center.add_child(vbox)
 
 	var resume := _menu_button("Resume")
-	resume.pressed.connect(func():
-		layer.queue_free()
-		_paused = false
-		_set_movement(true))
+	resume.pressed.connect(_resume_game)
 	vbox.add_child(resume)
 
 	var save := _menu_button("Save")

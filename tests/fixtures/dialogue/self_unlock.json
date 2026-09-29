@@ -1,0 +1,26 @@
+{
+  "start": {
+    "set_flag": {
+      "trusted_edith": false
+    },
+    "choices": [
+      {
+        "text": "Impossible self-unlock",
+        "requires_flag": {
+          "trusted_edith": true
+        },
+        "set_flag": {
+          "trusted_edith": true
+        },
+        "next": "blocked"
+      },
+      {
+        "text": "Leave",
+        "next": null
+      }
+    ]
+  },
+  "blocked": {
+    "next": null
+  }
+}
