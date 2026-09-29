@@ -120,7 +120,9 @@ allowed: `skeptic`, `believer`, `trusted_edith`, and `radioed_tom`. Names are
 case-sensitive and are not trimmed. Add new story flags to the narrative bible
 and the validator's `CANONICAL_FLAGS` together; a regression checks they agree.
 The scaffold's `lamp_relit` is not canonical yet and is rejected in dialogue.
-This check does not restrict flag values or modify saved flags.
+Values in `requires_flag` and node/choice `set_flag` must be JSON booleans
+(`true` or `false`), not strings, numbers, null, arrays or objects. This is an
+authoring check only; saved flags and runtime save/load behavior are unchanged.
 
 Reachability tracks separate `(node, flag state)` paths. Node effects run before
 requirements; choice effects run after them. A node can be revisited with changed

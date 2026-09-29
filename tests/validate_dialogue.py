@@ -6,7 +6,7 @@ Checks, for every data/dialogue/*.json file:
   - each node is either a linear node ("next": id|null) or a choice node
     ("choices": [{text, next, set_flag?, requires_flag?}]) — not neither, not both
   - choice requires_flag and node/choice set_flag are objects using canonical
-    story flag names from docs/narrative-bible.md
+    story flag names from docs/narrative-bible.md and Boolean values
   - each choice node has an unconditional fallback (no requirements or {})
   - every referenced target id exists
   - prerequisites and flag effects determine feasible nodes and choices
@@ -46,6 +46,8 @@ def validate_flags(value: object, field: str, location: str) -> list[str]:
                 f"{location} '{field}' uses unknown story flag '{name}' "
                 "(see docs/narrative-bible.md: Story flags (canonical))"
             )
+        elif not isinstance(value[name], bool):
+            errors.append(f"{location} '{field}' flag '{name}' must be a boolean (true or false)")
     return errors
 
 

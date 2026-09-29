@@ -247,13 +247,25 @@ class ConditionalChoiceTests(unittest.TestCase):
         ])
         self.assertEqual(len(warnings), 1)
 
-    def test_non_boolean_values_and_types_are_preserved(self):
-        graph = {"start": {"set_flag": {"trusted_edith": 1}, "choices": [
-            {"text": "Boolean", "requires_flag": {"trusted_edith": True}, "next": None},
-            {"text": "Numeric", "requires_flag": {"trusted_edith": 1.0}, "next": None},
-            {"text": "Leave", "next": None},
-        ]}}
-        self.assertEqual(reachable(graph, {"start"})[1], {("start", 1), ("start", 2)})
+    def test_non_boolean_flag_values_are_rejected_in_all_locations(self):
+        for value in ("true", "false", 0, 1, 1.0, None, [], {}):
+            for location in ("prerequisite", "node_effect", "choice_effect"):
+                with self.subTest(value=value, location=location):
+                    graph = {"start": {"choices": [{"text": "Leave", "next": None}]}}
+                    if location == "prerequisite":
+                        graph["start"]["choices"].insert(0, {
+                            "text": "Ask", "next": None, "requires_flag": {"trusted_edith": value},
+                        })
+                        prefix = "dialogue.json:start: choice #0 'requires_flag'"
+                    elif location == "node_effect":
+                        graph["start"]["set_flag"] = {"trusted_edith": value}
+                        prefix = "dialogue.json:start: 'set_flag'"
+                    else:
+                        graph["start"]["choices"][0]["set_flag"] = {"trusted_edith": value}
+                        prefix = "dialogue.json:start: choice #0 'set_flag'"
+                    self.assertEqual(self.validate_graph(graph), ([
+                        prefix + " flag 'trusted_edith' must be a boolean (true or false)"
+                    ], []))
 
 
 if __name__ == "__main__":
